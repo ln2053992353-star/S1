@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs grep:*)",
+      "Bash(python -c \"import faiss\")",
+      "Bash(pip install:*)",
+      "Bash(python -m pip list --disable-pip-version-check)",
+      "Bash(where python:*)",
+      "Bash(python -c \"import sys; print\\(sys.executable\\)\")",
+      "Bash(python -c \"import sys; print\\(''Python executable:'', sys.executable\\); print\\(''Python version:'', sys.version\\)\")",
+      "Bash(\"d:\\\\code\\\\smart_search_project\\\\.venv\\\\Scripts\\\\python.exe\" -c \"import sys; print\\(''Virtual env Python:'', sys.version\\)\")",
+      "Bash(\"d:\\\\code\\\\smart_search_project\\\\.venv\\\\Scripts\\\\python.exe\" -m pip list)",
+      "Bash(.venvScriptsactivate)",
+      "Bash(\"d:\\\\code\\\\smart_search_project\\\\.venv\\\\Scripts\\\\python.exe\" -m pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple)",
+      "Bash(\"d:\\\\code\\\\smart_search_project\\\\.venv\\\\Scripts\\\\python.exe\" -m pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple)",
+      "Bash(.venv/Scripts/python.exe manage.py check)",
+      "Bash(mysqldump --version)",
+      "Bash(.venvScriptspython --version)",
+      "Bash(ls -la \"C:\\\\Users\\\\a\\\\Desktop\\\\project 1/\"*.csv)",
+      "Bash(.venv/Scripts/python -c \"import pandas as pd; print\\(f''Pandas版本: {pd.__version__}''\\); import openpyxl; print\\(f''Openpyxl版本: {openpyxl.__version__}''\\)\")",
+      "Bash(set PYTHONIOENCODING=utf-8)",
+      "Bash(.venv/Scripts/python export_database_excel.py)",
+      "Bash(python manage.py migrate search_engine)",
+      "Bash(python manage.py init_pubchem_tables)",
+      "Bash(python manage.py sync_pubchem --help)",
+      "Bash(python -m py_compile /d/code/smart_search_project/search_engine/management/commands/sync_pubchem.py)",
+      "Bash(python manage.py makemigrations search_engine --dry-run)",
+      "Bash(python manage.py showmigrations search_engine)"
+    ]
+  }
+}

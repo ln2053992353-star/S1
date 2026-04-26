@@ -1,0 +1,655 @@
+import requests
+import urllib3
+import time
+import json
+import logging
+import re
+from datetime import datetime
+
+# 禁用SSL警告
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+from django.core.management.base import BaseCommand
+from django.db import transaction, IntegrityError
+from search_engine.models import Product, YeastPubChemData, PubChemTag, ProductPubChemTag
+
+# 可选翻译库导入
+try:
+    from deep_translator import GoogleTranslator
+    TRANSLATOR_AVAILABLE = True
+except ImportError:
+    TRANSLATOR_AVAILABLE = False
+
+logger = logging.getLogger(__name__)
+
+
+class Command(BaseCommand):
+    help = '从PubChem API同步化合物数据'
+
+    def __init__(self):
+        super().__init__()
+        self.proxies = None  # 初始化为None，表示无代理
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--delay',
+            type=float,
+            default=0.3,
+            help='API调用延迟(秒)，默认0.3秒遵守PubChem速率限制'
+        )
+        parser.add_argument(
+            '--max-retries',
+            type=int,
+            default=3,
+            help='API失败最大重试次数'
+        )
+        parser.add_argument(
+            '--retry-delay',
+            type=float,
+            default=2.0,
+            help='重试基础延迟(秒)'
+        )
+        parser.add_argument(
+            '--skip-failed',
+            action='store_true',
+            help='跳过已标记为同步失败的记录'
+        )
+        # 添加代理配置参数
+        parser.add_argument(
+            '--proxy',
+            type=str,
+            default=None,
+            help='HTTP代理地址，例如：http://127.0.0.1:7890'
+        )
+
+    def handle(self, *args, **options):
+        delay = options['delay']
+        max_retries = options['max_retries']
+        retry_delay = options['retry_delay']
+        skip_failed = options['skip_failed']
+        proxy_url = options['proxy']
+
+        # 配置局部代理（仅影响此脚本）
+        if proxy_url:
+            self.proxies = {
+                'http': proxy_url,
+                'https': proxy_url
+            }
+            self.stdout.write(f"🔧 使用局部代理: {proxy_url} (仅限此脚本)")
+        else:
+            self.stdout.write("🔧 未使用代理 (直连模式)")
+
+        # 获取需要同步的产品
+        products = self.get_products_to_sync(skip_failed)
+        total = products.count()
+
+        self.stdout.write(f"找到{total}个需要同步PubChem数据的产品")
+
+        success_count = 0
+        fail_count = 0
+        skip_count = 0
+
+        for i, product in enumerate(products, 1):
+            self.stdout.write(f"处理产品 {i}/{total}: {product.product_name}")
+
+            # 获取或创建PubChem数据记录
+            pubchem_data, created = YeastPubChemData.objects.get_or_create(product=product)
+
+            # 更新最后同步尝试时间
+            pubchem_data.last_sync_attempt = datetime.now()
+            try:
+                pubchem_data.save()
+            except IntegrityError as e:
+                # 记录冲突并标记为失败
+                self.mark_sync_failed(pubchem_data, 'CID数据库冲突')
+                logger.error(f"IntegrityError: {e}")
+                continue
+
+            # 跳过已标记为失败的记录（除非强制重试）
+            if skip_failed and pubchem_data.sync_failed:
+                self.stdout.write(self.style.WARNING(f"  跳过: 已标记为同步失败"))
+                skip_count += 1
+                continue
+
+            try:
+                # 通过产品名称搜索PubChem CID
+                cid = self.search_pubchem_cid_with_retry(
+                    product.product_name,
+                    max_retries=max_retries,
+                    base_delay=retry_delay
+                )
+
+                if cid:
+                    # 获取化合物详细信息
+                    compound_data = self.get_pubchem_compound_data_with_retry(
+                        cid,
+                        max_retries=max_retries,
+                        base_delay=retry_delay
+                    )
+
+                    if compound_data:
+                        # 更新产品信息
+                        with transaction.atomic():
+                            self.update_pubchem_data(pubchem_data, compound_data)
+                            success_count += 1
+                            self.stdout.write(
+                                self.style.SUCCESS(f"  成功同步: CID={cid}")
+                            )
+                    else:
+                        # 标记为失败
+                        self.mark_sync_failed(pubchem_data, "无法获取化合物详细信息")
+                        self.stdout.write(
+                            self.style.WARNING(f"  警告: 找到CID但无法获取详细信息")
+                        )
+                        fail_count += 1
+                else:
+                    # 未找到CID，标记为失败避免重复查询
+                    self.mark_sync_failed(pubchem_data, "未找到匹配的PubChem化合物")
+                    self.stdout.write(
+                        self.style.WARNING(f"  警告: 未找到匹配的PubChem化合物")
+                    )
+                    fail_count += 1
+
+            except Exception as e:
+                error_msg = str(e)
+                self.mark_sync_failed(pubchem_data, error_msg)
+                self.stdout.write(
+                    self.style.ERROR(f"  错误: {error_msg}")
+                )
+                fail_count += 1
+
+            # 遵守速率限制
+            time.sleep(delay)
+
+        self.stdout.write(self.style.SUCCESS(
+            f"\n同步完成！成功: {success_count}, 失败: {fail_count}, 跳过: {skip_count}"
+        ))
+
+    def get_products_to_sync(self, skip_failed):
+        """获取需要同步的产品列表"""
+        # 获取所有有PubChem数据记录且pubchem_cid为空的产品
+        products = Product.objects.filter(
+            pubchem_data__isnull=False,
+            pubchem_data__pubchem_cid__isnull=True
+        ).select_related('pubchem_data')
+
+        if skip_failed:
+            products = products.filter(pubchem_data__sync_failed=False)
+
+        return products
+
+    def search_pubchem_cid_with_retry(self, product_name, max_retries=3, base_delay=2.0):
+        """通过产品名称搜索PubChem CID，带重试机制"""
+        for attempt in range(max_retries):
+            try:
+                return self.search_pubchem_cid(product_name)
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code in [429, 503]:  # 速率限制或服务不可用
+                    wait_time = base_delay * (2 ** attempt)  # 指数退避
+                    self.stdout.write(
+                        f"  HTTP {e.response.status_code}，等待{wait_time:.1f}秒后重试 (尝试 {attempt+1}/{max_retries})"
+                    )
+                    time.sleep(wait_time)
+                else:
+                    raise
+            except requests.exceptions.RequestException as e:
+                if attempt < max_retries - 1:
+                    wait_time = base_delay * (2 ** attempt)
+                    self.stdout.write(
+                        f"  请求异常，等待{wait_time:.1f}秒后重试 (尝试 {attempt+1}/{max_retries})"
+                    )
+                    time.sleep(wait_time)
+                else:
+                    raise
+
+        return None
+
+    def search_pubchem_cid(self, product_name):
+        """通过产品名称搜索PubChem CID，支持中文翻译"""
+        # 检查是否为中文名称
+        search_name = product_name
+        is_translated = False
+
+        if self.contains_chinese(product_name):
+            self.stdout.write(f"  检测到中文名称: {product_name}")
+            translated_name = self.translate_chinese_to_english(product_name)
+            if translated_name:
+                search_name = translated_name
+                is_translated = True
+                self.stdout.write(f"  翻译为英文: {search_name}")
+            else:
+                self.stdout.write(f"  警告: 中文翻译失败，使用原始名称查询")
+
+        try:
+            # PubChem PUG REST API: 通过名称搜索CID
+            url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{search_name}/cids/JSON"
+            response = requests.get(url, proxies=self.proxies, verify=False, timeout=30)
+            response.raise_for_status()
+
+            data = response.json()
+            cids = data.get('IdentifierList', {}).get('CID', [])
+
+            result = cids[0] if cids else None
+
+            # 记录翻译结果
+            if is_translated and result:
+                self.stdout.write(f"  成功通过翻译找到CID: {result}")
+            elif is_translated and not result:
+                self.stdout.write(f"  警告: 翻译后仍未找到匹配化合物")
+
+            return result
+
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 404:
+                # 化合物未找到，正常情况
+                return None
+            else:
+                raise
+        except (KeyError, IndexError, json.JSONDecodeError) as e:
+            logger.warning(f"CID搜索数据解析失败: {e}")
+            return None
+
+    def contains_chinese(self, text):
+        """检查文本是否包含中文字符"""
+        # 匹配中文字符
+        chinese_pattern = re.compile(r'[\u4e00-\u9fff]+')
+        return bool(chinese_pattern.search(text))
+
+    def translate_chinese_to_english(self, chinese_text):
+        """将中文翻译为英文"""
+        if not TRANSLATOR_AVAILABLE:
+            self.stdout.write(self.style.WARNING(
+                "  警告: 未安装deep-translator库，无法翻译中文名称。请运行: pip install deep-translator"
+            ))
+            return None
+
+        try:
+            # 翻译中文到英文
+            translated = GoogleTranslator(source='zh-CN', target='en').translate(chinese_text)
+            return translated
+        except Exception as e:
+            self.stdout.write(self.style.WARNING(f"  翻译失败: {e}"))
+            return None
+
+    def get_pubchem_compound_data_with_retry(self, cid, max_retries=3, base_delay=2.0):
+        """获取化合物的详细信息，带重试机制"""
+        for attempt in range(max_retries):
+            try:
+                return self.get_pubchem_compound_data(cid)
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code in [429, 503]:
+                    wait_time = base_delay * (2 ** attempt)
+                    self.stdout.write(
+                        f"  HTTP {e.response.status_code}，等待{wait_time:.1f}秒后重试 (尝试 {attempt+1}/{max_retries})"
+                    )
+                    time.sleep(wait_time)
+                else:
+                    raise
+            except requests.exceptions.RequestException as e:
+                if attempt < max_retries - 1:
+                    wait_time = base_delay * (2 ** attempt)
+                    self.stdout.write(
+                        f"  请求异常，等待{wait_time:.1f}秒后重试 (尝试 {attempt+1}/{max_retries})"
+                    )
+                    time.sleep(wait_time)
+                else:
+                    raise
+
+        return None
+
+    def get_pubchem_compound_data(self, cid):
+        """获取化合物的详细信息"""
+        try:
+            # 获取化合物基本信息和描述
+            compound_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/JSON"
+            desc_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/description/JSON"
+
+            compound_response = requests.get(compound_url, proxies=self.proxies, verify=False, timeout=30)
+            desc_response = requests.get(desc_url, proxies=self.proxies, verify=False, timeout=30)
+
+            compound_response.raise_for_status()
+            compound_data = compound_response.json()
+
+            desc_data = {}
+            if desc_response.status_code == 200:
+                desc_data = desc_response.json()
+
+            # 尝试获取分类信息
+            classification_data = self.get_pubchem_classification_data(cid)
+
+            return self.parse_compound_data(cid, compound_data, desc_data, classification_data)
+
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 404:
+                # 化合物详细信息未找到
+                return None
+            else:
+                raise
+
+    def get_pubchem_classification_data(self, cid):
+        """获取化合物的分类信息（如MeSH分类）"""
+        try:
+            # 示例：获取MeSH分类
+            mesh_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/classification/JSON"
+            response = requests.get(mesh_url, proxies=self.proxies, verify=False, timeout=30)
+            if response.status_code == 200:
+                return response.json()
+        except Exception:
+            pass
+        return None
+
+    def parse_classification_response(self, classification_data):
+        """
+        解析PubChem分类API响应，提取分类信息和MeSH术语
+        返回: (classifications, mesh_terms)
+        """
+        classifications = []
+        mesh_terms = []
+
+        if not classification_data:
+            return classifications, mesh_terms
+
+        try:
+            # 尝试解析PubChem分类API的结构
+            # 根据PubChem文档，分类API返回的JSON可能包含不同格式
+
+            # 方法1: 尝试提取层级分类
+            if isinstance(classification_data, dict):
+                if 'Hierarchies' in classification_data:
+                    hierarchies = classification_data['Hierarchies']
+                    if 'Hierarchy' in hierarchies and isinstance(hierarchies['Hierarchy'], list):
+                        for hierarchy in hierarchies['Hierarchy']:
+                            if 'Node' in hierarchy and isinstance(hierarchy['Node'], list):
+                                for node in hierarchy['Node']:
+                                    if 'Information' in node:
+                                        info = node['Information']
+                                        classification = {
+                                            'name': info.get('Name', 'Unknown'),
+                                            'category': info.get('Type', 'pubchem'),
+                                            'type': info.get('Kind', 'classification'),
+                                            'confidence': 1.0
+                                        }
+                                        classifications.append(classification)
+
+                # 方法2: 尝试提取MeSH术语
+                if 'InformationList' in classification_data:
+                    info_list = classification_data['InformationList']
+                    if 'Information' in info_list and isinstance(info_list['Information'], list):
+                        for info in info_list['Information']:
+                            if 'MeSHTerms' in info and isinstance(info['MeSHTerms'], list):
+                                for term in info['MeSHTerms']:
+                                    mesh_term = {
+                                        'name': term.get('Name', 'Unknown'),
+                                        'id': term.get('ID', None),
+                                        'category': 'mesh'
+                                    }
+                                    mesh_terms.append(mesh_term)
+
+            # 方法3: 通用解析，寻找常见的键
+            def recursive_extract(data, prefix=''):
+                if isinstance(data, dict):
+                    for key, value in data.items():
+                        current_path = f"{prefix}.{key}" if prefix else key
+                        # 检查是否有名称和ID的组合（可能是分类或术语）
+                        if key.lower() in ['name', 'term', 'label'] and isinstance(value, str):
+                            # 尝试找到对应的ID
+                            parent = data
+                            if 'id' in parent or 'ID' in parent:
+                                term_id = parent.get('id') or parent.get('ID')
+                                term_type = 'mesh' if 'mesh' in current_path.lower() else 'classification'
+                                if term_type == 'mesh':
+                                    mesh_terms.append({
+                                        'name': value,
+                                        'id': term_id,
+                                        'category': term_type
+                                    })
+                                else:
+                                    classifications.append({
+                                        'name': value,
+                                        'category': term_type,
+                                        'type': current_path,
+                                        'confidence': 0.8
+                                    })
+                        elif isinstance(value, (dict, list)):
+                            recursive_extract(value, current_path)
+                elif isinstance(data, list):
+                    for item in data:
+                        recursive_extract(item, prefix)
+
+            # 如果前两种方法没有提取到数据，使用递归提取
+            if not classifications and not mesh_terms:
+                recursive_extract(classification_data)
+
+        except Exception as e:
+            # 记录错误但继续执行
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"解析PubChem分类数据失败: {e}")
+
+        return classifications, mesh_terms
+
+    def extract_use_and_manufacturing_info(self, compound_data, desc_data):
+        """从PubChem数据中提取用途和制造信息"""
+        use_tags = []
+
+        # 方法1: 从化合物属性中提取
+        if 'PC_Compounds' in compound_data:
+            for prop in compound_data['PC_Compounds'][0].get('props', []):
+                urn = prop.get('urn', {})
+                label = urn.get('label', '')
+                value = prop.get('value', {})
+
+                # 检查是否与用途、制造相关的属性
+                if label.lower() in ['use', 'uses', 'application', 'applications',
+                                     'manufacturing', 'manufacture', 'preparation',
+                                     'intended use', 'safety/hazards/toxicity information']:
+                    if isinstance(value, dict) and 'sval' in value:
+                        use_text = value['sval']
+                    elif isinstance(value, str):
+                        use_text = value
+                    else:
+                        continue
+
+                    # 提取标签（按逗号、分号、句号分割）
+                    if use_text:
+                        # 清理文本
+                        use_text = use_text.strip()
+                        # 分割成单独的标签
+                        import re
+                        # 按常见的分隔符分割
+                        parts = re.split(r'[,;\.\n]', use_text)
+                        for part in parts:
+                            part = part.strip()
+                            if part and len(part) >= 3:  # 最小长度限制
+                                use_tags.append({
+                                    'name': part,
+                                    'category': 'use_and_manufacturing',
+                                    'type': label,
+                                    'confidence': 0.9
+                                })
+
+        # 方法2: 从描述信息中提取
+        if desc_data and 'InformationList' in desc_data:
+            for info in desc_data['InformationList'].get('Information', []):
+                if 'Description' in info:
+                    description = info['Description']
+                    # 在描述中查找用途相关的关键词
+                    import re
+                    # 定义用途相关关键词模式
+                    use_patterns = [
+                        r'used (?:for|in|as) ([^\.]+)',
+                        r'application(?:s)? (?:include|are) ([^\.]+)',
+                        r'primarily (?:used|utilized) ([^\.]+)',
+                        r'employed (?:for|in) ([^\.]+)'
+                    ]
+
+                    for pattern in use_patterns:
+                        matches = re.findall(pattern, description, re.IGNORECASE)
+                        for match in matches:
+                            # 清理匹配文本
+                            match = match.strip()
+                            if match and len(match) >= 3:
+                                # 分割成多个标签
+                                sub_parts = re.split(r'[,;]', match)
+                                for sub_part in sub_parts:
+                                    sub_part = sub_part.strip()
+                                    if sub_part:
+                                        use_tags.append({
+                                            'name': sub_part,
+                                            'category': 'use_and_manufacturing',
+                                            'type': 'description_extraction',
+                                            'confidence': 0.7
+                                        })
+
+        # 去重
+        seen = set()
+        unique_tags = []
+        for tag in use_tags:
+            tag_name = tag['name'].lower()
+            if tag_name not in seen:
+                seen.add(tag_name)
+                unique_tags.append(tag)
+
+        return unique_tags
+
+    def parse_compound_data(self, cid, compound_data, desc_data, classification_data):
+        """解析PubChem API响应数据"""
+        result = {
+            'cid': cid,
+            'iupac_name': None,
+            'description': None,
+            'classifications': [],
+            'mesh_terms': [],
+            'use_and_manufacturing_tags': []  # 新增字段
+        }
+
+        # 解析IUPAC名称
+        if 'PC_Compounds' in compound_data:
+            for prop in compound_data['PC_Compounds'][0].get('props', []):
+                if prop.get('urn', {}).get('label') == 'IUPAC Name':
+                    result['iupac_name'] = prop.get('value', {}).get('sval')
+                    break
+
+        # 解析描述信息
+        if desc_data and 'InformationList' in desc_data:
+            for info in desc_data['InformationList'].get('Information', []):
+                if 'Description' in info:
+                    result['description'] = info['Description']
+                    break
+
+        # 解析分类信息
+        if classification_data:
+            # 尝试解析PubChem分类API响应
+            classifications, mesh_terms = self.parse_classification_response(classification_data)
+            result['classifications'] = classifications
+            result['mesh_terms'] = mesh_terms
+
+        # 提取用途和制造信息
+        use_tags = self.extract_use_and_manufacturing_info(compound_data, desc_data)
+        result['use_and_manufacturing_tags'] = use_tags
+
+        return result
+
+    def update_pubchem_data(self, pubchem_data, compound_data):
+        """用PubChem数据更新记录"""
+        pubchem_data.pubchem_cid = compound_data['cid']
+        iupac_name = compound_data.get('iupac_name')
+        if iupac_name:
+            # 安全截断，防止极端畸形数据
+            # 保留前10000字符，这应该足够容纳任何合理的IUPAC名称
+            pubchem_data.iupac_name = iupac_name[:10000]
+        else:
+            pubchem_data.iupac_name = None
+        pubchem_data.functional_description = compound_data.get('description')
+
+        # 清除失败标记
+        pubchem_data.sync_failed = False
+        pubchem_data.sync_failed_reason = None
+        pubchem_data.last_sync_success = datetime.now()
+
+        try:
+            pubchem_data.save()
+        except IntegrityError as e:
+            # 记录冲突并标记为失败
+            self.mark_sync_failed(pubchem_data, 'CID数据库冲突')
+            logger.error(f"IntegrityError: {e}")
+            raise
+
+        # 更新PubChem标签
+        self.update_pubchem_tags(pubchem_data.product, compound_data)
+
+        # 更新嵌入向量文本（如果存在）
+        if hasattr(pubchem_data.product, 'embedding'):
+            pubchem_data.product.embedding.update_embedding_text()
+            pubchem_data.product.embedding.save()
+
+    def update_pubchem_tags(self, product, compound_data):
+        """创建或更新PubChem标签"""
+        # 处理分类信息
+        for classification in compound_data.get('classifications', []):
+            tag, created = PubChemTag.objects.get_or_create(
+                tag_name=classification.get('name', 'Unknown'),
+                defaults={
+                    'tag_category': classification.get('category', 'pubchem'),
+                    'pubchem_classification': classification.get('type')
+                }
+            )
+
+            # 创建关联
+            ProductPubChemTag.objects.get_or_create(
+                product=product,
+                pubchem_tag=tag,
+                defaults={
+                    'confidence_score': classification.get('confidence', 1.0),
+                    'source': 'pubchem_api'
+                }
+            )
+
+        # 处理MeSH术语
+        for mesh_term in compound_data.get('mesh_terms', []):
+            tag, created = PubChemTag.objects.get_or_create(
+                tag_name=mesh_term.get('name', 'Unknown'),
+                defaults={
+                    'tag_category': 'mesh',
+                    'mesh_id': mesh_term.get('id')
+                }
+            )
+
+            ProductPubChemTag.objects.get_or_create(
+                product=product,
+                pubchem_tag=tag,
+                defaults={
+                    'confidence_score': 1.0,
+                    'source': 'pubchem_api'
+                }
+            )
+
+        # 处理用途和制造标签
+        for use_tag in compound_data.get('use_and_manufacturing_tags', []):
+            tag, created = PubChemTag.objects.get_or_create(
+                tag_name=use_tag.get('name', 'Unknown'),
+                defaults={
+                    'tag_category': 'use_and_manufacturing',
+                    'pubchem_classification': use_tag.get('type', 'extracted')
+                }
+            )
+
+            ProductPubChemTag.objects.get_or_create(
+                product=product,
+                pubchem_tag=tag,
+                defaults={
+                    'confidence_score': use_tag.get('confidence', 0.7),
+                    'source': 'pubchem_api_use_info'
+                }
+            )
+
+    def mark_sync_failed(self, pubchem_data, reason):
+        """标记同步失败"""
+        pubchem_data.sync_failed = True
+        # 字段防爆：截断错误字符串至前200字符
+        pubchem_data.sync_failed_reason = str(reason)[:200] if reason else None
+
+        try:
+            pubchem_data.save()
+        except IntegrityError as e:
+            # 记录错误但继续执行
+            logger.error(f"无法标记同步失败: {e}")

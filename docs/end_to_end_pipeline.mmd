@@ -1,0 +1,79 @@
+flowchart TD
+    %% 1. 原始文献摄入 (Raw Literature Ingestion)
+    A["原始PDF文献<br/><code>250/250.py</code>"]
+    B["PDF文本提取<br/><code>fitz.open() + page.get_text()</code>"]
+    C["AI产物提取 (火山引擎)<br/><code>extract_data_v8() → client.chat.completions.create()</code>"]
+    D["正则DOI提取<br/><code>find_doi_with_regex()</code>"]
+    E["直接插入MySQL<br/><code>pymysql.connect() → INSERT INTO products</code>"]
+    F["Django模型映射<br/><code>search_engine/models.py<br/>Product, ProductEmbedding</code>"]
+
+    %% 2. 数据清洗与增强 (Data Cleaning & Enrichment)
+    G["LLM深度清洗<br/><code>clean_database.py → clean_text_with_ai()</code>"]
+    H["PubChem数据同步<br/><code>sync_pubchem.py</code>"]
+    I["数据回填与解析<br/><code>backfill_parsed_data.py → parse_embedding_text()</code>"]
+
+    %% 3. 嵌入文本构建 (Embedding Text Construction)
+    J["构建嵌入文本<br/><code>ProductEmbedding.update_embedding_text()</code>"]
+    K["结构化信息解析<br/><code>ProductEmbedding.parse_embedding_text()</code>"]
+
+    %% 4. 向量生成 (Vector Generation)
+    L["加载本地向量模型<br/><code>SentenceTransformer('pritamdeka/S-PubMedBert-MS-MARCO')</code>"]
+    M["生成768维向量<br/><code>vectorize_products.py → model.encode()</code>"]
+    N["向量JSON序列化<br/><code>json.dumps(vector_array.tolist())</code>"]
+    O["存储向量到数据库<br/><code>ProductEmbedding.vector字段</code>"]
+
+    %% 5. FAISS索引构建 (FAISS Index Construction)
+    P["加载所有向量<br/><code>VectorIndex.build_from_database()</code>"]
+    Q["向量归一化<br/><code>faiss.normalize_L2(vectors_np)</code>"]
+    R["构建内积索引<br/><code>faiss.IndexFlatIP(dimension)</code>"]
+    S["保存索引文件<br/><code>faiss.write_index() + pickle元数据</code>"]
+    T["全局索引单例<br/><code>get_vector_index() → VectorIndex</code>"]
+
+    %% 6. 混合搜索服务 (Hybrid Search Service)
+    U["用户自然语言查询<br/><code>search_service.hybrid_search()</code>"]
+    V["AI意图识别 (火山引擎)<br/><code>_analyze_intent_with_llm()</code>"]
+    W["标签白名单过滤<br/><code>_get_tag_ids_from_names()</code>"]
+    X["查询向量化<br/><code>_get_local_embedding() → model.encode()</code>"]
+    Y["FAISS向量相似度搜索<br/><code>search_similar_vectors() → index.search()</code>"]
+    Z["动态阈值调整<br/><code>get_dynamic_thresholds()</code>"]
+    AA["结果排序与返回<br/><code>safe_similarity_score()</code>"]
+
+    %% 连接流程
+    A --> B
+    B --> C
+    B --> D
+    C --> E
+    D --> E
+    E --> F
+
+    F --> G
+    F --> H
+    G --> I
+    H --> I
+    I --> J
+
+    J --> K
+    K --> J
+
+    J --> L
+    L --> M
+    M --> N
+    N --> O
+
+    O --> P
+    P --> Q
+    Q --> R
+    R --> S
+    S --> T
+
+    U --> V
+    V --> W
+    W --> X
+    X --> Y
+    Y --> Z
+    Z --> AA
+
+    %% 数据流向交叉连接
+    T --> Y
+    F --> W
+    O --> P

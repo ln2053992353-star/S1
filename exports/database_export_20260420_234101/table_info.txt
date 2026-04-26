@@ -1,0 +1,81 @@
+数据库表信息汇总
+导出时间: 2026-04-20 23:41:01
+数据库: demo1
+============================================================
+
+表: products (792 行)
+----------------------------------------
+  product_id                     int                  NOT NULL                          [PRI]
+  product_name                   varchar(255)         NOT NULL                          [UNI]
+  grna_map                       text                 NULL                              
+  description                    text                 NULL                              
+  source_filename                varchar(255)         NULL                              
+  source_doi                     varchar(255)         NULL                              
+
+表: pubchem_tags (200 行)
+----------------------------------------
+  tag_id                         int                  NOT NULL                          [PRI]
+  tag_name                       varchar(255)         NOT NULL                          [UNI]
+  tag_category                   varchar(100)         NULL                              [MUL]
+  pubchem_classification         varchar(200)         NULL                              [MUL]
+  mesh_id                        varchar(50)          NULL                              
+
+表: product_pubchem_tags (236 行)
+----------------------------------------
+  id                             int                  NOT NULL                          [PRI]
+  confidence_score               double               NOT NULL                          
+  source                         varchar(50)          NOT NULL                          
+  product_id                     int                  NOT NULL                          [MUL]
+  pubchem_tag_id                 int                  NOT NULL                          [MUL]
+
+表: yeast_pubchem_data (792 行)
+----------------------------------------
+  product_id                     int                  NOT NULL                          [PRI]
+  pubchem_cid                    int                  NULL                              [MUL]
+  iupac_name                     longtext             NULL                              
+  functional_description         longtext             NULL                              
+  sync_failed                    tinyint(1)           NOT NULL                          [MUL]
+  sync_failed_reason             varchar(255)         NULL                              
+  last_sync_attempt              datetime(6)          NULL                              
+  last_sync_success              datetime(6)          NULL                              
+
+表: tags (2733 行)
+----------------------------------------
+  tag_id                         int                  NOT NULL                          [PRI]
+  tag_name                       varchar(255)         NOT NULL                          [UNI]
+  tag_category                   varchar(100)         NULL                              
+
+表: product_tags (5452 行)
+----------------------------------------
+  id                             int                  NOT NULL                          [PRI]
+  product_id                     int                  NOT NULL                          [MUL]
+  tag_id                         int                  NOT NULL                          [MUL]
+
+表: tag_hierarchies (0 行)
+----------------------------------------
+  id                             int                  NOT NULL                          [PRI]
+  parent_object_id               int unsigned         NULL                              
+  child_object_id                int unsigned         NOT NULL                          
+  relationship_type              varchar(50)          NOT NULL                          [MUL]
+  confidence                     double               NOT NULL                          
+  source                         varchar(50)          NOT NULL                          
+  level                          int                  NOT NULL                          [MUL]
+  created_at                     datetime(6)          NOT NULL                          
+  updated_at                     datetime(6)          NOT NULL                          
+  child_content_type_id          int                  NOT NULL                          [MUL]
+  parent_content_type_id         int                  NULL                              [MUL]
+
+表: tag_category_system (0 行)
+----------------------------------------
+  id                             int                  NOT NULL                          [PRI]
+  category_path                  varchar(255)         NOT NULL                          [UNI]
+  display_name                   varchar(255)         NOT NULL                          
+  level                          int                  NOT NULL                          [MUL]
+  parent_path                    varchar(255)         NULL                              
+  description                    longtext             NULL                              
+  tag_type                       varchar(20)          NOT NULL                          [MUL]
+  example_tags                   longtext             NULL                              
+  usage_count                    int                  NOT NULL                          
+  created_at                     datetime(6)          NOT NULL                          
+  updated_at                     datetime(6)          NOT NULL                          
+
