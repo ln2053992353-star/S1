@@ -47,11 +47,8 @@ except AttributeError as e:
 
 # 本地向量模型 (懒加载，防止启动报错)
 LOCAL_EMBED_MODEL = None
-<<<<<<< HEAD
-=======
 
 
->>>>>>> b26fe0879d6c3d08b887fc72ef509b810749cf8a
 # ==============================================================================
 # 3. 安全相似度分数计算函数
 # ==============================================================================
@@ -73,11 +70,9 @@ def safe_similarity_score(similarity: float) -> float:
         logger.info(f"🔧 [Similarity Fix] 相似度已从 {similarity} 修正为 {score}%")
 
     return score
-<<<<<<< HEAD
-=======
 
 
->>>>>>> b26fe0879d6c3d08b887fc72ef509b810749cf8a
+
 # ==============================================================================
 # 4. 阈值动态调整函数
 # ==============================================================================
@@ -132,11 +127,9 @@ def get_dynamic_thresholds(query: str, candidate_count: int) -> dict:
     thresholds['final_threshold'] = max(0.05, min(0.5, thresholds['final_threshold']))
 
     return thresholds
-<<<<<<< HEAD
-=======
 
 
->>>>>>> b26fe0879d6c3d08b887fc72ef509b810749cf8a
+
 def get_model():
     """懒加载本地向量模型"""
     global LOCAL_EMBED_MODEL
@@ -150,11 +143,9 @@ def get_model():
             logger.error(f"❌ [Error] Local Model load failed: {e}")
             return None
     return LOCAL_EMBED_MODEL
-<<<<<<< HEAD
-=======
 
 
->>>>>>> b26fe0879d6c3d08b887fc72ef509b810749cf8a
+
 # ==============================================================================
 # 2. 核心混合搜索逻辑 (Hybrid Search)
 # ==============================================================================
@@ -244,11 +235,9 @@ def hybrid_search(user_query, top_k=20):
 
     scored_results.sort(key=lambda x: x.match_score, reverse=True)
     return scored_results[:top_k], ai_result
-<<<<<<< HEAD
-=======
 
 
->>>>>>> b26fe0879d6c3d08b887fc72ef509b810749cf8a
+
 # ==============================================================================
 # 3. LLM 接口 (火山引擎)
 # ==============================================================================
@@ -287,31 +276,13 @@ def _analyze_intent_with_llm(query, available_tags):
     [TAG MAPPING TASK]
     Map the user's intent to the most relevant database tags using these guidelines:
 
-<<<<<<< HEAD
     1. **Precision Guidelines**:
-=======
-    1. **Semantic Mapping Rules**:
-       - "starving/hungry/nutrient deprivation" → ["Metabolism", "Nutrient Sensing", "Stress Response"]
-       - "light/blue light/optogenetics" → ["Optogenetics", "Light Sensing", "Signal Transduction"]
-       - "cancer/tumor/oncology" → ["Cancer", "Oncology", "Therapeutics"]
-       - "gene editing/CRISPR/genome engineering" → ["CRISPR", "Genome Editing", "Genetic Engineering"]
-       - "fluorescent/GFP/RFP/imaging" → ["Fluorescent Proteins", "Imaging", "Reporters"]
-       - "cell death/apoptosis/necrosis" → ["Apoptosis", "Cell Death", "Cell Biology"]
-       - "infection/virus/bacterial" → ["Infection", "Virology", "Microbiology"]
-       - "development/differentiation/growth" → ["Development", "Differentiation", "Cell Growth"]
-
-    2. **Precision Guidelines**:
->>>>>>> b26fe0879d6c3d08b887fc72ef509b810749cf8a
        - Prefer specific tags over general ones when appropriate
        - Use 1-3 tags maximum to avoid over-filtering
        - Only use tags from the provided list
        - Return empty list [] if no relevant tags found
 
-<<<<<<< HEAD
     2. **Chinese Query Support**:
-=======
-    3. **Chinese Query Support**:
->>>>>>> b26fe0879d6c3d08b887fc72ef509b810749cf8a
        - Recognize common Chinese biological terminology
        - Map Chinese colloquial expressions to scientific terms
 
@@ -425,20 +396,16 @@ def _analyze_intent_with_llm(query, available_tags):
         logger.error(f"❌ [AI Error] Volcengine Call failed: {e}")
         # 降级：如果 AI 挂了，直接用原词搜
         return {"filter_tags": [], "english_query": query}
-<<<<<<< HEAD
-=======
 
 
->>>>>>> b26fe0879d6c3d08b887fc72ef509b810749cf8a
+
 def _get_local_embedding(text):
     model = get_model()
     if model is None: return None
     return model.encode(text).tolist()
-<<<<<<< HEAD
-=======
 
 
->>>>>>> b26fe0879d6c3d08b887fc72ef509b810749cf8a
+
 def _get_tag_ids_from_names(tag_names):
     """将标签名称列表转换为标签ID列表，支持精确匹配和模糊匹配"""
     if not tag_names:
@@ -476,11 +443,9 @@ def _get_tag_ids_from_names(tag_names):
     except Exception as e:
         logger.error(f"❌ [Error] 获取标签ID失败: {e}")
         return []
-<<<<<<< HEAD
-=======
 
 
->>>>>>> b26fe0879d6c3d08b887fc72ef509b810749cf8a
+
 # ==============================================================================
 # 6. 增强标签搜索系统（支持层次结构、分类和语义扩展）
 # ==============================================================================
@@ -624,11 +589,9 @@ def _get_enhanced_tag_ids(tag_names, expand_hierarchy=True, include_categories=N
         import traceback
         traceback.print_exc()
         return [], []
-<<<<<<< HEAD
-=======
 
 
->>>>>>> b26fe0879d6c3d08b887fc72ef509b810749cf8a
+
 def _expand_tag_hierarchy(tag_id, content_type, max_depth=2):
     """
     扩展标签层次结构：获取父标签、子标签和相关标签
@@ -707,11 +670,9 @@ def _expand_tag_hierarchy(tag_id, content_type, max_depth=2):
     except Exception as e:
         logger.error(f"❌ [Error] 扩展标签层次失败: {e}")
         return {tag_id}
-<<<<<<< HEAD
-=======
 
 
->>>>>>> b26fe0879d6c3d08b887fc72ef509b810749cf8a
+
 def _search_by_category(category_paths, tag_type='both'):
     """
     根据分类路径搜索标签
@@ -767,11 +728,9 @@ def _search_by_category(category_paths, tag_type='both'):
     except Exception as e:
         logger.error(f"❌ [Error] 分类搜索失败: {e}")
         return [], []
-<<<<<<< HEAD
-=======
 
 
->>>>>>> b26fe0879d6c3d08b887fc72ef509b810749cf8a
+
 def _get_semantic_similar_tags(tag_names, threshold=0.7, max_results=10):
     """
     获取语义相似的标签（基于AI分析或预定义同义词）
@@ -849,11 +808,9 @@ def _get_semantic_similar_tags(tag_names, threshold=0.7, max_results=10):
     except Exception as e:
         logger.error(f"❌ [Error] 语义相似标签搜索失败: {e}")
         return [], []
-<<<<<<< HEAD
-=======
 
 
->>>>>>> b26fe0879d6c3d08b887fc72ef509b810749cf8a
+
 def hybrid_search_enhanced(user_query, top_k=20, use_enhanced_tags=True):
     """
     增强版混合搜索：集成标签层次结构、分类系统和语义扩展
