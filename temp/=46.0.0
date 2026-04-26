@@ -1,4 +1,0 @@
-Requirement already satisfied: PyMySQL==1.1.2 in .\.venv\Lib\site-packages (1.1.2)
-Requirement already satisfied: cryptography in .\.venv\Lib\site-packages (46.0.5)
-Requirement already satisfied: cffi>=2.0.0 in .\.venv\Lib\site-packages (from cryptography) (2.0.0)
-Requirement already satisfied: pycparser in .\.venv\Lib\site-packages (from cffi>=2.0.0->cryptography) (3.0)
