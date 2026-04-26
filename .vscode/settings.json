@@ -1,0 +1,77 @@
+{
+    // Python配置
+    "python.defaultInterpreterPath": "d:\\code\\smart_search_project\\.venv\\Scripts\\python.exe",
+    "python.venvPath": "d:\\code\\smart_search_project\\.venv",
+    "python.terminal.activateEnvironment": true,
+    "python.terminal.activateEnvInCurrentTerminal": true,
+    "python.languageServer": "Pylance",
+    "python.analysis.extraPaths": [
+        "${workspaceFolder}"
+    ],
+    "python.analysis.diagnosticMode": "workspace",
+    "python.linting.enabled": true,
+    "python.linting.pylintEnabled": true,
+    "python.linting.pylintArgs": [
+        "--load-plugins",
+        "pylint_django",
+        "--django-settings-module=smart_search_project.settings"
+    ],
+    "python.formatting.provider": "black",
+    "python.formatting.blackArgs": [
+        "--line-length",
+        "88"
+    ],
+    "python.testing.pytestEnabled": false,
+    "python.testing.unittestEnabled": true,
+    "python.testing.unittestArgs": [
+        "-v",
+        "-s",
+        ".",
+        "-p",
+        "*test*.py"
+    ],
+
+    // Django扩展配置
+    "django.snippets.enabled": true,
+
+    // 编辑器配置
+    "[python]": {
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit"
+        },
+        "editor.defaultFormatter": "ms-python.black-formatter"
+    },
+    "editor.tabSize": 4,
+    "editor.insertSpaces": true,
+    "editor.detectIndentation": false,
+    "files.trimTrailingWhitespace": true,
+    "files.insertFinalNewline": true,
+    "files.trimFinalNewlines": true,
+
+    // 文件排除
+    "files.exclude": {
+        "**/__pycache__": true,
+        "**/.pytest_cache": true,
+        "**/.mypy_cache": true,
+        "**/*.pyc": true
+    },
+
+    // 终端配置
+    "terminal.integrated.env.windows": {
+        "HF_ENDPOINT": "https://hf-mirror.com",
+        "NO_PROXY": "ark.cn-beijing.volces.com,localhost,127.0.0.1",
+        "DJANGO_SETTINGS_MODULE": "smart_search_project.settings"
+    },
+
+    // 工作区设置
+    "search.exclude": {
+        "**/node_modules": true,
+        "**/bower_components": true,
+        "**/.git": true,
+        "**/.hg": true,
+        "**/.svn": true,
+        "**/.DS_Store": true,
+        "**/__pycache__": true
+    }
+}
