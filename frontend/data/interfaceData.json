@@ -1,0 +1,23 @@
+{
+  "formatter": {
+    "raw_input": "我想做玻璃",
+    "refined_input": "Silicon, Oxygen; Functions: essential components for glass production, providing structural framework and transparency.",
+    "verification_score": 99,
+    "verification_rules": "reason ...",
+    "search_results": [
+      {
+        "name": "silica",
+        "description": "Product: silica\nDescription: Recovered from alkaline pre-extraction liquor as high-purity (99.8%) amorphous particles; 86.4% of initial silica in wheat straw was recovered.\ngRNA: N/A\nFunction: Recovered from alkaline pre-extraction liquor as high-purity (99.8%) amorphous particles; 86.4% of initial silica in wheat straw was recovered.\nPubChem Data:\nIUPAC: dioxosilane\nPubChem CID: 24261\nPubChem Description: Silicon dioxide is a silicon oxide made up of linear triatomic molecules in which a silicon atom is covalently bonded to two oxygens.\nTags: industrial chemical; pharmaceuticals; silica; catalysts; composite fillers; high-value product",
+        "metadata": {
+          "product_name": "silica",
+          "iupac_name": "dioxosilane",
+          "tags": "industrial chemical; pharmaceuticals; silica; catalysts; composite fillers; high-value product",
+          "source_doi": "10.1016/j.biortech.2018.03.044"
+        },
+        "similarity": 0.5122941732406616
+      }
+    ],
+    "iteration_count": 1,
+    "final_recommendation": "[{\"product_name\":\"silica\",\"score\":99,\"reason\":\"Silica (silicon dioxide) is a primary component of glass production, providing structural framework and transparency, matching the user's requirement.\",\"doi\":\"10.1016/j.biortech.2018.03.044\",\"similarity_score\":0.5123}]"
+  }
+}

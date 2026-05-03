@@ -1,0 +1,77 @@
+<!--
+  Biochemical Product Recommendation Report — Standalone Frontend Module
+
+  Serve this directory over HTTP to load ES modules:
+      cd frontend && python -m http.server 8080
+      Then open http://localhost:8080
+
+  Future CSS migration:
+      The Tailwind CDN can be replaced with a compiled/static CSS build
+      (e.g. tailwindcss CLI, PostCSS, or a custom stylesheet). The Tailwind
+      utility classes used in the markup must still be supported by the
+      replacement CSS — simply removing the CDN line without providing
+      equivalent CSS will break styling.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Biochemical Product Recommendation Report</title>
+
+  <!-- Tailwind CSS CDN — replace with compiled/static CSS for production -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- FontAwesome Icons CDN -->
+  <link
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+    rel="stylesheet"
+  >
+
+  <!--
+    Isolated custom styles.
+    All layout/color/spacing uses Tailwind utilities (above).
+    The rules below are limited to: animations, skeleton loader, progress bar transition.
+  -->
+  <style>
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-in-up {
+      animation: fadeInUp 0.4s ease-out forwards;
+    }
+
+    @keyframes pulse-skeleton {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: 0.4; }
+    }
+    .skeleton-pulse {
+      animation: pulse-skeleton 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    .progress-fill {
+      transition: width 0.6s ease-out;
+    }
+
+    /* Stagger animation for cards */
+    .card-stagger > *:nth-child(1)  { animation-delay: 0.05s; }
+    .card-stagger > *:nth-child(2)  { animation-delay: 0.10s; }
+    .card-stagger > *:nth-child(3)  { animation-delay: 0.15s; }
+    .card-stagger > *:nth-child(4)  { animation-delay: 0.20s; }
+    .card-stagger > *:nth-child(5)  { animation-delay: 0.25s; }
+    .card-stagger > *:nth-child(6)  { animation-delay: 0.30s; }
+    .card-stagger > *:nth-child(7)  { animation-delay: 0.35s; }
+    .card-stagger > *:nth-child(8)  { animation-delay: 0.40s; }
+    .card-stagger > *:nth-child(9)  { animation-delay: 0.45s; }
+    .card-stagger > *:nth-child(10) { animation-delay: 0.50s; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans text-gray-700 antialiased">
+
+  <div id="app"></div>
+
+  <script type="module" src="./js/app.js"></script>
+
+</body>
+</html>
