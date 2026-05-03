@@ -1,276 +1,99 @@
+<!--
+  Biochemical Product Recommendation Report — Search Flow Integration
+
+  Serve via Django runserver:
+      python manage.py runserver 0.0.0.0:8000
+      Open http://localhost:8000/
+
+  Data source: frontend/data/interfaceData.json (loaded by Django view).
+  The search form updates the raw_input field in the embedded JSON.
+-->
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Engineered Cell Products Search</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome Icons -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        /* 简单的动画效果 */
-        details > summary {
-            list-style: none;
-        }
-        details > summary::-webkit-details-marker {
-            display: none;
-        }
-        @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade-in-up {
-            animation: fadeInUp 0.4s ease-out forwards;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Biochemical Product Recommendation Report</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- FontAwesome Icons CDN -->
+  <link
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+    rel="stylesheet"
+  >
+
+  <style>
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-in-up {
+      animation: fadeInUp 0.4s ease-out forwards;
+    }
+    @keyframes pulse-skeleton {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: 0.4; }
+    }
+    .skeleton-pulse {
+      animation: pulse-skeleton 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    .progress-fill {
+      transition: width 0.6s ease-out;
+    }
+    details > summary {
+      list-style: none;
+    }
+    details > summary::-webkit-details-marker {
+      display: none;
+    }
+  </style>
 </head>
-<body class="bg-gray-50 min-h-screen font-sans text-gray-700">
+<body class="bg-gray-50 min-h-screen font-sans text-gray-700 antialiased">
 
-    <div class="container mx-auto px-4 py-10 max-w-4xl">
+  <div class="container mx-auto px-4 py-10 max-w-5xl">
 
-        <!-- 1. Header -->
-        <div class="text-center mb-10">
-            <h1 class="text-4xl font-extrabold text-blue-900 mb-2 tracking-tight">
-                🧬 Bio-Product Search Engine
-            </h1>
-            <p class="text-gray-500 text-lg">
-                Powered by <span class="font-semibold text-blue-600">Volcengine AI</span> & <span class="font-semibold text-pink-600">PubMedBert</span>
-            </p>
-        </div>
-
-        <!-- 2. Search Box -->
-        <div class="bg-white p-6 rounded-2xl shadow-lg mb-8 border border-gray-100">
-            <form action="/" method="get" class="flex flex-col sm:flex-row gap-3">
-                <div class="relative flex-1">
-                    <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <i class="fas fa-search text-gray-400"></i>
-                    </div>
-                    <input type="text" name="q" value="{{ query }}"
-                           placeholder="Try natural language: 'I am starving', 'Blue light response'..."
-                           class="w-full pl-11 pr-4 py-4 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg transition shadow-sm">
-                </div>
-                <button type="submit"
-                        class="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-8 py-4 rounded-xl font-bold text-lg shadow-md transition transform hover:scale-105 active:scale-95">
-                    Search
-                </button>
-            </form>
-        </div>
-
-        {% if query %}
-            <!-- 3. AI Analysis Report -->
-            <div class="flex flex-col gap-4 mb-8 animate-fade-in-up">
-
-                <!-- Stats -->
-                <div class="flex justify-between items-center text-sm text-gray-500 px-2">
-                    <span>Found <strong>{{ count }}</strong> results</span>
-                    <span>Processed in {{ time }}s</span>
-                </div>
-
-                <!-- AI Panel -->
-                <div class="bg-white border-l-4 border-blue-500 p-5 rounded-r-xl shadow-sm ring-1 ring-gray-900/5">
-                    <div class="flex items-center mb-3">
-                        <div class="bg-blue-100 text-blue-600 p-2 rounded-lg mr-3">
-                            <i class="fas fa-robot text-xl"></i>
-                        </div>
-                        <div>
-                            <h3 class="font-bold text-gray-900">AI Intent Analysis</h3>
-                            <p class="text-xs text-gray-500">Volcengine Interpretation</p>
-                        </div>
-                    </div>
-
-                    <div class="space-y-3 pl-1">
-                        <!-- Filters Display -->
-                        <div class="flex items-start">
-                            <span class="w-24 font-semibold text-gray-600 text-sm mt-1">🎯 Filters:</span>
-                            <div class="flex-1">
-                                {% if filter_tags %}
-                                    <div class="flex flex-wrap gap-2">
-                                        {% for tag in filter_tags %}
-                                            <!-- AI Filter Tag Style -->
-                                            <span class="inline-flex items-center gap-1 bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-sm">
-                                                <i class="fas fa-check text-[10px]"></i> {{ tag }}
-                                            </span>
-                                        {% endfor %}
-                                    </div>
-                                {% else %}
-                                    <span class="text-gray-400 italic text-sm">No specific tags detected.</span>
-                                {% endif %}
-                            </div>
-                        </div>
-
-                        <!-- Query Display -->
-                        <div class="flex items-start">
-                            <span class="w-24 font-semibold text-gray-600 text-sm mt-1">🔤 Query:</span>
-                            <div class="flex-1">
-                                <code class="bg-gray-50 px-2 py-1 rounded border border-gray-200 text-pink-600 text-sm font-mono break-all">
-                                    {{ rewritten_query|default:"-" }}
-                                </code>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        {% endif %}
-
-        <!-- 4. Results List -->
-        <div class="space-y-6">
-            {% for item in results %}
-            <div class="group bg-white p-6 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 relative overflow-hidden">
-
-                <!-- Hover Strip -->
-                <div class="absolute top-0 left-0 w-1 h-full bg-blue-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-
-                <!-- Title & Score -->
-                <div class="flex justify-between items-start mb-3 pl-2">
-                    <h3 class="text-xl font-bold text-gray-900 leading-snug group-hover:text-blue-700 transition-colors">
-                        {{ item.product_name }}
-                    </h3>
-                    {% if item.match_score %}
-                    <span class="flex items-center gap-1 bg-green-50 text-green-700 text-xs font-bold px-3 py-1 rounded-full border border-green-200 shadow-sm">
-                        <i class="fas fa-chart-line"></i> {{ item.match_score }}% Match
-                    </span>
-                    {% endif %}
-                </div>
-
-                <!-- ✅ Tags Display (智能折叠版) -->
-                <div class="mb-4 pl-2">
-                    <div class="flex flex-wrap gap-2 items-center">
-                        {% with tags=item.tags.all %}
-                            {# 1. 显示前5个标签 #}
-                            {% for tag in tags|slice:":5" %}
-                                <span class="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 border border-blue-100 px-2.5 py-1 rounded-lg text-xs font-medium hover:bg-blue-100 transition-colors cursor-default">
-                                    <i class="fas fa-tag text-[10px] opacity-60"></i>
-                                    {{ tag.tag_name }}
-                                </span>
-                            {% endfor %}
-
-                            {# 2. 如果超过5个，使用 details 折叠剩余标签 #}
-                            {% if tags|length > 5 %}
-                                <details class="group relative inline-block">
-                                    <summary class="cursor-pointer inline-flex items-center gap-1 bg-gray-100 text-gray-500 border border-gray-200 px-2 py-1 rounded-lg text-xs font-medium hover:bg-gray-200 transition-colors select-none">
-                                        <span class="group-open:hidden">+ {{ tags|length|add:"-5" }} more</span>
-                                        <span class="hidden group-open:inline text-gray-700">Show less</span>
-                                    </summary>
-
-                                    <!-- 展开后的标签容器 -->
-                                    <div class="mt-2 flex flex-wrap gap-2 w-full">
-                                        {% for tag in tags|slice:"5:" %}
-                                            <span class="inline-flex items-center gap-1.5 bg-gray-50 text-gray-600 border border-gray-200 px-2.5 py-1 rounded-lg text-xs font-medium">
-                                                {{ tag.tag_name }}
-                                            </span>
-                                        {% endfor %}
-                                    </div>
-                                </details>
-                            {% endif %}
-                        {% endwith %}
-                    </div>
-                </div>
-
-                <!-- Description / AI Summary -->
-                <div class="mb-5 pl-2">
-                    {% if item.embedding.embedding_text %}
-                        {% with parsed=item.embedding.parsed_embedding_text %}
-                            {% if parsed.function %}
-                                <div class="bg-indigo-50 p-4 rounded-lg border border-indigo-100 text-gray-700 text-sm leading-relaxed mb-2 relative">
-                                    <div class="absolute -top-3 left-4 bg-white px-2 py-0.5 rounded border border-indigo-200 text-indigo-600 font-bold text-[10px] uppercase tracking-wider shadow-sm">
-                                        <i class="fas fa-sparkles text-yellow-400"></i> AI Summary
-                                    </div>
-                                    {{ parsed.function }}
-                                </div>
-                            {% else %}
-                                <p class="text-gray-600 text-sm leading-relaxed line-clamp-3">
-                                    {{ parsed.description|default:item.description }}
-                                </p>
-                            {% endif %}
-                        {% endwith %}
-                    {% else %}
-                        <p class="text-gray-600 text-sm leading-relaxed line-clamp-3">
-                            {{ item.description }}
-                        </p>
-                    {% endif %}
-                </div>
-
-                <!-- ✅ Footer (Sources & DOIs 智能折叠版) -->
-                <div class="text-xs text-gray-500 bg-gray-50 p-3 rounded-lg flex flex-col gap-2">
-                    {% if item.source_filename %}
-                    <div class="flex items-center gap-2">
-                        <i class="far fa-file-alt text-gray-400"></i>
-                        <span class="font-semibold text-gray-600">Source:</span>
-                        <span class="truncate">{{ item.source_filename }}</span>
-                    </div>
-                    {% endif %}
-
-                    <div class="flex flex-col gap-1 mt-1">
-                        {% with sources=item.sources.all %}
-
-                            {# 1. 显示前2个 DOI #}
-                            {% for source in sources|slice:":2" %}
-                                <div class="flex items-center gap-2">
-                                    <i class="fas fa-book text-blue-400"></i>
-                                    {% if source.filename %}
-                                        <span class="text-gray-400">[{{ source.filename }}]</span>
-                                    {% endif %}
-
-                                    {% if source.doi and source.doi != 'N/A' %}
-                                        <a href="https://doi.org/{{ source.doi }}" target="_blank" class="text-blue-600 hover:text-blue-800 hover:underline decoration-dashed">
-                                            {{ source.doi }} <i class="fas fa-external-link-alt text-xs ml-1"></i>
-                                        </a>
-                                    {% else %}
-                                        <span class="text-gray-400">DOI N/A</span>
-                                    {% endif %}
-                                </div>
-                            {% empty %}
-                                {% if item.source_doi %}
-                                    <div class="flex items-center gap-2">
-                                        <i class="fas fa-book text-gray-400"></i>
-                                        <span>{{ item.source_doi }} (Legacy)</span>
-                                    </div>
-                                {% endif %}
-                            {% endfor %}
-
-                            {# 2. 如果超过2个，折叠剩余 DOI #}
-                            {% if sources|length > 2 %}
-                                <details class="group mt-1">
-                                    <summary class="cursor-pointer text-blue-500 hover:text-blue-700 font-medium inline-flex items-center gap-1 select-none">
-                                        <span class="group-open:hidden">View {{ sources|length|add:"-2" }} more references <i class="fas fa-chevron-down text-[10px]"></i></span>
-                                        <span class="hidden group-open:inline">Hide extra references <i class="fas fa-chevron-up text-[10px]"></i></span>
-                                    </summary>
-
-                                    <div class="mt-2 pl-2 border-l-2 border-gray-200 flex flex-col gap-1">
-                                        {% for source in sources|slice:"2:" %}
-                                            <div class="flex items-center gap-2">
-                                                <i class="fas fa-book text-gray-300"></i>
-                                                {% if source.filename %}
-                                                    <span class="text-gray-400">[{{ source.filename }}]</span>
-                                                {% endif %}
-
-                                                {% if source.doi and source.doi != 'N/A' %}
-                                                    <a href="https://doi.org/{{ source.doi }}" target="_blank" class="text-gray-600 hover:text-blue-600 hover:underline decoration-dashed">
-                                                        {{ source.doi }}
-                                                    </a>
-                                                {% else %}
-                                                    <span class="text-gray-400">DOI N/A</span>
-                                                {% endif %}
-                                            </div>
-                                        {% endfor %}
-                                    </div>
-                                </details>
-                            {% endif %}
-
-                        {% endwith %}
-                    </div>
-                </div>
-            </div>
-            {% empty %}
-                {% if query %}
-                <div class="text-center py-16 bg-white rounded-2xl border border-dashed border-gray-300">
-                    <p class="text-lg font-medium text-gray-900">No matching products found</p>
-                </div>
-                {% endif %}
-            {% endfor %}
-        </div>
+    <!-- Header -->
+    <div class="text-center mb-10">
+      <h1 class="text-3xl md:text-4xl font-extrabold text-gray-900 mb-2 tracking-tight">
+        Biochemical Product Recommendation Report
+      </h1>
+      <p class="text-gray-500 text-sm">
+        Powered by <span class="font-semibold text-blue-600">Volcengine AI</span>
+        &amp; <span class="font-semibold text-pink-600">PubMedBert</span>
+      </p>
     </div>
+
+    <!-- Search Box -->
+    <div class="bg-white p-6 rounded-2xl shadow-lg mb-8 border border-gray-100">
+      <form action="/" method="get" class="flex flex-col sm:flex-row gap-3">
+        <div class="relative flex-1">
+          <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+            <i class="fas fa-search text-gray-400"></i>
+          </div>
+          <input type="text" name="q" value="{{ query }}"
+                 placeholder="Try: 'I want to make glass', 'Blue light response'..."
+                 class="w-full pl-11 pr-4 py-4 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg transition shadow-sm">
+        </div>
+        <button type="submit"
+                class="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-8 py-4 rounded-xl font-bold text-lg shadow-md transition transform hover:scale-105 active:scale-95">
+          Search
+        </button>
+      </form>
+    </div>
+
+    <!-- Embedded data for the frontend JS module -->
+    <script id="search-data" type="application/json">{{ data_json|safe }}</script>
+
+    <!-- Recommendation report mount point -->
+    <div id="app"></div>
+
+    <!-- ES module entry point -->
+    <script type="module" src="{% static 'frontend/js/app.js' %}"></script>
+
+  </div>
 
 </body>
 </html>

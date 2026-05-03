@@ -1,25 +1,26 @@
 /**
- * Application entry point.
+ * Application entry point (Django embedded version).
  *
- * Orchestrates: fetch → parse → render → mount.
- *
- * To reconnect to a real API, change `dataSource: 'api'` and set `apiEndpoint`.
+ * Reads data from <script id="search-data" type="application/json"> tag
+ * rendered by the Django template. Falls back to local JSON if the embedded
+ * element is not present (standalone mode).
  */
 import DataProvider from './utils/dataProvider.js';
 import { parseRecommendationData } from './utils/recommendationParser.js';
 import { RecommendationReport } from './components/RecommendationReport.js';
 
 (function () {
-  var dataProvider = new DataProvider({
-    dataSource: 'local',
-    localPath: './data/interfaceData.json'
-    // Future API usage:
-    // dataSource: 'api',
-    // apiEndpoint: '/api/recommendation/',
-    // apiMethod: 'POST'
-  });
-
   var root = document.getElementById('app');
+  if (!root) return;
+
+  // If embedded data element exists, use it; otherwise fall back to local JSON
+  var embeddedEl = document.getElementById('search-data');
+  var dataSource = embeddedEl ? 'embedded' : 'local';
+
+  var dataProvider = new DataProvider({
+    dataSource: dataSource,
+    localPath: './data/interfaceData.json'
+  });
 
   function showLoading() {
     root.innerHTML =
@@ -76,7 +77,6 @@ import { RecommendationReport } from './components/RecommendationReport.js';
         root.innerHTML = '';
         root.appendChild(reportElement);
 
-        // Trigger progress bar fill animations after DOM is live
         requestAnimationFrame(function () {
           var fills = root.querySelectorAll('.progress-fill');
           for (var i = 0; i < fills.length; i++) {
@@ -94,7 +94,6 @@ import { RecommendationReport } from './components/RecommendationReport.js';
       });
   }
 
-  // Bootstrap
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {

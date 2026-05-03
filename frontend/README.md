@@ -24,36 +24,87 @@ frontend/
   js/
     app.js                            # Bootstrap, orchestration, error/loading states
     utils/
-      dataProvider.js                 # Data access abstraction
-      recommendationParser.js         # Parse, merge, validate, sort
+      dataProvider.js                 # Data access abstraction (local JSON → future API)
+      recommendationParser.js         # Parse, merge, validate, PubChem extraction
     components/
       RecommendationReport.js         # Page layout + info cards + recommendation list
-      RecommendationCard.js           # Single recommendation card
+      RecommendationCard.js           # Single recommendation card (all 8 sections)
+```
+
+## Parser Output (camelCase)
+
+`parseRecommendationData(rawData)` returns:
+
+```js
+{
+  formatter: {
+    rawInput: "我想做玻璃",
+    refinedInput: "...",
+    verificationScore: 99,
+    verificationRules: "...",
+    iterationCount: 1
+  },
+  recommendations: [
+    {
+      productName: "silica",
+      evaluationScore: 99,
+      semanticSimilarity: 0.5123,
+      recommendationReason: "Silica ...",
+      functionalDescriptionClean: "Product: silica\nDescription: ...",  // w/o PubChem block
+      descriptionRaw: "Product: silica\n...\nPubChem Data:\nIUPAC: ...", // full original
+      doi: "10.1016/j.biortech.2018.03.044",
+      iupacName: "dioxosilane",
+      pubchemCid: "24261",
+      pubchemDescription: "Silicon dioxide is a silicon oxide made up of...",
+      tags: "industrial chemical; pharmaceuticals; silica; ...",
+      isTop: true,
+      isFallback: false
+    }
+  ],
+  warning: null
+}
 ```
 
 ## JSON Field → UI Field Mapping
 
 ### Top Info Cards
 
-| JSON Path | UI Card |
-|-----------|---------|
-| `formatter.raw_input` | User Input |
-| `formatter.refined_input` | Refined Input |
-| `formatter.verification_score` | Verification Score (color-coded badge) |
-| `formatter.iteration_count` | Iteration Count |
+| JSON Path | Parser Field | UI Card |
+|-----------|-------------|---------|
+| `formatter.raw_input` | `rawInput` | User Input |
+| `formatter.refined_input` | `refinedInput` | Refined Input |
+| `formatter.verification_score` | `verificationScore` | Verification Score (color-coded) |
+| `formatter.iteration_count` | `iterationCount` | Iteration Count |
 
-### Recommendation Cards
+### Recommendation Card Sections
 
-| UI Field | Data Source (priority order) |
-|----------|------------------------------|
-| Product Name | `final_recommendation[].product_name` |
-| Evaluation Score | `final_recommendation[].score` |
-| Semantic Similarity | `final_recommendation[].similarity_score` → `search_results[].similarity` |
-| Recommendation Reason | `final_recommendation[].reason` |
-| Functional Description | `search_results[].description` (matched by product name) |
-| DOI | `final_recommendation[].doi` → `search_results[].metadata.source_doi` |
-| IUPAC Name | `search_results[].metadata.iupac_name` |
-| Tags | `search_results[].metadata.tags` |
+| Section | Data Source (priority order) |
+|---------|------------------------------|
+| Product Name | `final_rec.product_name` → `sr.metadata.product_name` → `sr.name` |
+| Evaluation Score | `final_rec.score` (progress bar, color-coded: green≥80, amber≥50, red<50) |
+| Semantic Similarity | `final_rec.similarity_score` → `sr.similarity` (4 decimal places) |
+| Recommendation Reason | `final_rec.reason` |
+| Functional Description | `sr.description` — with PubChem block stripped (`functionalDescriptionClean`) |
+| PubChem Data | **Parsed from** `sr.description` (see below) |
+| DOI | `final_rec.doi` → `sr.metadata.source_doi` |
+
+### PubChem Data Parsing
+
+PubChem fields are extracted from `search_results[].description` using line-based regex:
+
+| PubChem Field | Regex Pattern | Fallback |
+|--------------|---------------|----------|
+| IUPAC | `/^IUPAC:\s*(.*)$/mi` | `sr.metadata.iupac_name` |
+| PubChem CID | `/^PubChem CID:\s*(.*)$/mi` | — |
+| PubChem Description | `/^PubChem Description:\s*(.*)$/mi` | — |
+| Tags | `/^Tags:\s*(.*)$/mi` | `sr.metadata.tags` |
+
+The PubChem block is identified by the `PubChem Data:` marker line in the
+description. Everything before that marker becomes `functionalDescriptionClean`;
+everything after is parsed into individual labeled fields.
+
+Invalid values (`""`, `"N/A"`, `"nan"`, `"null"`, `"undefined"`) are treated
+as missing — they do not render in the UI.
 
 ### Merging Logic
 
@@ -62,12 +113,13 @@ frontend/
 - The card order follows `final_recommendation` order exactly (no re-sort).
 - If `final_recommendation` is missing or fails to parse, fallback cards are
   built from `search_results` alone, and a warning banner is shown.
+- Fallback cards also parse PubChem Data from `search_results[].description`.
 - The first card is marked "Top Recommendation" with an amber highlight.
 
 ### DOI Handling
 
 - DOI values are trimmed.
-- Empty string, `"N/A"`, and `"nan"` are treated as missing (no link rendered).
+- Empty string, `"N/A"`, `"nan"`, `"null"`, `"undefined"` are treated as missing.
 - Valid DOIs render as `https://doi.org/{doi}` with `target="_blank"` and
   `rel="noopener noreferrer"`.
 
@@ -88,7 +140,7 @@ var dataProvider = new DataProvider({
 var dataProvider = new DataProvider({
   dataSource: 'api',
   apiEndpoint: '/api/recommendation/',  // or full URL
-  apiMethod: 'POST',                     // if needed
+  apiMethod: 'POST',
   timeout: 15000
 });
 ```
@@ -100,6 +152,17 @@ same shape regardless of data source.
 
 If the API returns a different shape, add a transformation step in
 `recommendationParser.js` before the merge logic.
+
+## Current Limitations
+
+- **Local JSON only** — reads data exclusively from `frontend/data/interfaceData.json`.
+  Does not call any backend API.
+- **HTTP required** — ES modules (`type="module"`) cannot load over `file://` protocol.
+  Must be served over HTTP (e.g. `python -m http.server 8080`).
+- **No build tools** — no npm, webpack, Vite, or TypeScript compilation step.
+  All dependencies (Tailwind CSS, FontAwesome) are loaded from CDN.
+- **Static data** — page content is static once loaded from JSON. No real-time updates,
+  no user input form for new queries (this is a report page, not a search page).
 
 ## Styling
 

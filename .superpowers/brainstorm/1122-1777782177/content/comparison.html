@@ -1,0 +1,46 @@
+<h2>8000 vs 8080 - Side by Side Comparison</h2>
+<p class="subtitle">Both versions are running right now — open them in your browser</p>
+
+<div class="section">
+  <h3>Live Links</h3>
+  <div style="display:flex;gap:24px;margin-top:12px;">
+    <a href="http://localhost:8000" target="_blank" style="display:inline-block;padding:12px 24px;background:#2563eb;color:white;border-radius:8px;text-decoration:none;font-weight:600;">Open 8000 (Django)</a>
+    <a href="http://localhost:8080" target="_blank" style="display:inline-block;padding:12px 24px;background:#059669;color:white;border-radius:8px;text-decoration:none;font-weight:600;">Open 8080 (Standalone)</a>
+  </div>
+</div>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">Port 8000 — Django Integrated</div>
+    <div class="mockup-body">
+      <div class="mock-input" style="margin-bottom:8px;">🔍 Try: 'I want to make glass', 'Blue light response'...</div>
+      <div class="mock-button" style="margin-bottom:16px;">Search</div>
+      <p style="font-size:13px;color:#6b7280;">✅ Search box — can query the database</p>
+      <p style="font-size:13px;color:#6b7280;">✅ Powered by Volcengine AI + PubMedBert</p>
+      <p style="font-size:13px;color:#6b7280;">✅ Data from Django view (dynamic or JSON fallback)</p>
+      <p style="font-size:13px;color:#6b7280;">✅ Same report below</p>
+    </div>
+  </div>
+  <div class="mockup">
+    <div class="mockup-header">Port 8080 — Standalone Module</div>
+    <div class="mockup-body">
+      <p style="font-size:13px;color:#6b7280;margin-top:40px;">❌ No search box</p>
+      <p style="font-size:13px;color:#6b7280;">✅ Clean report only</p>
+      <p style="font-size:13px;color:#6b7280;">✅ Data from interfaceData.json directly</p>
+      <p style="font-size:13px;color:#6b7280;">✅ Zero Django dependency</p>
+      <p style="font-size:13px;color:#6b7280;">✅ Can run with just python http.server</p>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:24px;">
+  <h3>Screenshots (PNG files saved to project root)</h3>
+  <p class="subtitle">screenshot_8000_django.png and screenshot_8080_standalone.png</p>
+</div>
+
+<div class="section" style="margin-top:24px;">
+  <h3>Key Insight</h3>
+  <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:16px;">
+    <p style="margin:0;">The <strong>8080 standalone version</strong> is the "stripped frontend module" your colleague asked for. The <strong>8000 Django version</strong> was kept untouched — it still works as before, embedding the same JS module but adding search functionality on top.</p>
+  </div>
+</div>
