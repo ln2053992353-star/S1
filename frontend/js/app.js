@@ -11,12 +11,7 @@ import { RecommendationReport } from './components/RecommendationReport.js';
 
 (function () {
   var dataProvider = new DataProvider({
-    dataSource: 'local',
-    localPath: './data/interfaceData.json'
-    // Future API usage:
-    // dataSource: 'api',
-    // apiEndpoint: '/api/recommendation/',
-    // apiMethod: 'POST'
+    dataSource: 'embedded'
   });
 
   var root = document.getElementById('app');

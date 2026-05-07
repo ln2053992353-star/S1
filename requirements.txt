@@ -29,5 +29,10 @@ transformers>=4.30.0  # sentence-transformers依赖
 scikit-learn>=1.0.0  # 可能用于相似度计算
 faiss-cpu>=1.7.0  # 向量搜索
 
+# LangGraph workflow (师姐的推荐系统)
+langgraph>=0.2.0
+langchain-groq>=0.2.0
+chromadb>=0.5.0
+
 # 安装命令: pip install -r requirements.txt
 # 或使用国内镜像: pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple

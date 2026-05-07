@@ -1,0 +1,95 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Biochemical Product Recommendation Report</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- FontAwesome Icons CDN -->
+  <link
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+    rel="stylesheet"
+  >
+
+  <style>
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-in-up {
+      animation: fadeInUp 0.4s ease-out forwards;
+    }
+
+    @keyframes pulse-skeleton {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: 0.4; }
+    }
+    .skeleton-pulse {
+      animation: pulse-skeleton 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    .progress-fill {
+      transition: width 0.6s ease-out;
+    }
+
+    .card-stagger > *:nth-child(1)  { animation-delay: 0.05s; }
+    .card-stagger > *:nth-child(2)  { animation-delay: 0.10s; }
+    .card-stagger > *:nth-child(3)  { animation-delay: 0.15s; }
+    .card-stagger > *:nth-child(4)  { animation-delay: 0.20s; }
+    .card-stagger > *:nth-child(5)  { animation-delay: 0.25s; }
+    .card-stagger > *:nth-child(6)  { animation-delay: 0.30s; }
+    .card-stagger > *:nth-child(7)  { animation-delay: 0.35s; }
+    .card-stagger > *:nth-child(8)  { animation-delay: 0.40s; }
+    .card-stagger > *:nth-child(9)  { animation-delay: 0.45s; }
+    .card-stagger > *:nth-child(10) { animation-delay: 0.50s; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans text-gray-700 antialiased">
+
+  <!-- Search Form -->
+  <div class="max-w-5xl mx-auto px-4 pt-8 pb-2">
+    <form method="GET" action="/" class="relative">
+      <div class="flex gap-3">
+        <div class="relative flex-1">
+          <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
+          <input
+            type="text"
+            name="q"
+            value="{{ query }}"
+            placeholder="Search for chemical products, biological compounds, genes..."
+            class="w-full pl-11 pr-4 py-3.5 bg-white border border-gray-200 rounded-xl shadow-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-sm"
+          >
+        </div>
+        <button
+          type="submit"
+          class="px-6 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl shadow-sm transition flex items-center gap-2 text-sm"
+        >
+          <i class="fas fa-search"></i>
+          Search
+        </button>
+      </div>
+
+      {% if query and search_time %}
+      <div class="flex items-center gap-4 mt-2 text-xs text-gray-400">
+        <span><i class="fas fa-clock mr-1"></i>{{ search_time }}s</span>
+        <span><i class="fas fa-database mr-1"></i>{{ result_count }} results</span>
+      </div>
+      {% endif %}
+    </form>
+  </div>
+
+  <!-- Embedded data from Django backend -->
+  <script id="search-data" type="application/json">{{ data_json|safe }}</script>
+
+  <!-- Application root -->
+  <div id="app"></div>
+
+  <!-- Frontend ES module -->
+  <script type="module" src="{% static 'js/app.js' %}"></script>
+
+</body>
+</html>
